@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck all bash
+        run: |
+          mapfile -t files < <(git ls-files 'lib/*.sh' 'bin/*' 'install.sh' 'modules/**/*.sh' 'post-bootstrap/**/*.sh')
+          echo "checking ${#files[@]} files"
+          shellcheck -x "${files[@]}"
+
+  unit:
+    name: bats
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install bats
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq bats
+      - name: run unit tests
+        run: bats tests/
