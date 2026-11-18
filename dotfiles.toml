@@ -1,0 +1,12 @@
+# dotfiles.toml: which modules get installed.
+#
+# Set at most ONE of the two lists. Both empty = install everything.
+# Values are module ids: the folder names under modules/ and post-bootstrap/.
+#
+# include: install ONLY these modules, plus the modules they depend on.
+#          (`dotfiles --only a,b` does the same for one run and ignores this file.)
+# exclude: install everything EXCEPT these modules. Excluding a module that
+#          another selected module depends on is an error.
+
+include = []
+exclude = []

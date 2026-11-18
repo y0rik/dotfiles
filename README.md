@@ -37,12 +37,17 @@ dotfiles --yes              # no prompts (skips post-bootstrap unless asked for)
 
 ## Choosing what gets installed
 
-_(planned)_ `dotfiles.toml` sets **one** of:
+`dotfiles.toml` sets **at most one** of two lists. Both empty means install everything.
 
 ```toml
-include = []   # install ONLY these modules
-exclude = []   # install everything EXCEPT these modules
+include = ["kubernetes"]   # install ONLY these modules, plus what they depend on
+exclude = ["nvidia"]       # install everything EXCEPT these modules
 ```
+
+- Values are module ids: the folder names under `modules/` and `post-bootstrap/`.
+- `dotfiles --only a,b` works like `include` for one run and ignores the file.
+- Mistakes stop the run **before anything is installed**: setting both lists, an unknown module id (the error lists the valid ones), a misspelled key such as `includes`, or excluding a module that another selected module needs.
+- To customise: download `dotfiles.toml`, edit it, and run with `--config <your-file>` _(flag planned)_.
 
 ## Modules
 
