@@ -3,3 +3,5 @@
 FROM mikefarah/yq:4.44.3 AS yq
 FROM bats/bats:1.11.0
 COPY --from=yq /usr/bin/yq /usr/bin/yq
+# git, curl: tests/install.bats clones a local fixture repo and expects both present (as on CI).
+RUN apk add --no-cache git curl

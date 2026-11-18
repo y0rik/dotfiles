@@ -15,11 +15,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: shellcheck all bash
+      - name: shellcheck all bash (pinned image, same as local runs)
         run: |
           mapfile -t files < <(git ls-files 'lib/*.sh' 'bin/*' 'install.sh' 'modules/**/*.sh' 'post-bootstrap/**/*.sh' 'tests/stubs/*')
           echo "checking ${#files[@]} files"
-          shellcheck -x "${files[@]}"
+          docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:v0.11.0 -x "${files[@]}"
 
   unit:
     name: bats

@@ -29,7 +29,7 @@ Modelled on [TechDufus/dotfiles](https://github.com/TechDufus/dotfiles) (`main`)
 ## Repository layout
 
 ```
-install.sh            → gist launcher (planned)
+install.sh            → gist launcher: OS check, git/curl, mise (>= min), clone/pull ~/.dotfiles, link ~/.local/bin/dotfiles, exec runner
 bin/dotfiles          → runner: flags, preconditions, phases, prompt, exit code
 dotfiles.toml         → which modules run: include / exclude
 lib/os.sh             → os_detect (fedora|ubuntu, else exit 2), os_version, os_codename
@@ -41,13 +41,17 @@ lib/modules.sh        → modules_discover <root>, modules_select <phase> [only-
 lib/apply.sh          → conf.d links, apply_module <id> (mise call + status), apply_save_env, apply_summary
 modules/<id>/         → bootstrap-phase modules
 post-bootstrap/<id>/  → post-bootstrap-phase modules
-tests/                → bats tests, helpers.bash (mkmod fixture builder), fixtures, stubs/ (fake mise, sudo), Dockerfile (bats + yq)
+tests/                → bats tests, helpers.bash (mkmod fixture builder), fixtures, stubs/ (fake mise, sudo), Dockerfile (bats, yq, git, curl)
 .github/workflows/    → CI
 README.md             → user documentation
 agentic.md            → this file
 ```
 
 Run logs go to `~/.dotfiles_log/<ISO-timestamp>-<phase>.log`, outside the repo.
+
+## The launcher (`install.sh`)
+
+Published as a gist; the repo copy is the source of truth. It can't source `lib/` (the repo isn't cloned yet), so it parses os-release itself. All code is inside `main`, called on the last line, so a partly downloaded script runs nothing. Exit 2 = stopped before the runner (unsupported OS, mise too old, `~/.dotfiles` not a clone or has local changes, can't fast-forward, a real file at `~/.local/bin/dotfiles`); otherwise it `exec`s the runner, so the exit code is the runner's. `MISE_MIN_VERSION` is duplicated in `install.sh` and `bin/dotfiles`: change both. Overrides: `DOTFILES_BRANCH` (default `main`), `DOTFILES_DIR`, `DOTFILES_REPO`, `DOTFILES_OS_RELEASE`.
 
 ## How a run works
 
@@ -115,15 +119,17 @@ Rules already fixed:
 
 ```bash
 bats tests/                        # unit tests (needs mikefarah yq v4 on PATH)
-shellcheck -x lib/*.sh bin/dotfiles tests/stubs/*   # lint
+shellcheck -x install.sh lib/*.sh bin/dotfiles tests/stubs/*   # lint (CI pins v0.11.0)
 # Without local installs:
 docker build -q -t dotfiles-test tests/
 docker run --rm -v "$PWD:/code:ro" -w /code dotfiles-test tests/
 docker run --rm --user 1000:1000 -v "$PWD:/code:ro" -w /code dotfiles-test tests/   # also runs the sudo tests
-docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:v0.10.0 -x lib/*.sh bin/dotfiles tests/stubs/*
+docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:v0.11.0 -x install.sh lib/*.sh bin/dotfiles tests/stubs/*
 ```
 
 Fixture modules are built per test with `mkmod <root> <bootstrap|post-bootstrap> <id> [dep...]` from `tests/helpers.bash`.
+
+`tests/install.bats` runs `install.sh` offline: `DOTFILES_REPO` is a local fixture repo whose `bin/dotfiles` only records its arguments, and the stub `mise` stands in for the real one (one test fakes `curl` to check the mise install path). Installing git/curl with dnf/apt is checked by hand in `fedora:latest` / `ubuntu:rolling` containers.
 
 `tests/runner.bats` runs the real `bin/dotfiles` against a fixture tree (`DOTFILES_ROOT`) and a temporary `HOME`, with `tests/stubs/` first on `PATH`. The stub `mise` only answers for modules reachable as `$MISE_CONFIG_DIR/conf.d/<id>/mise.<id>.toml`, logs every call to `STUB_MISE_LOG`, and misbehaves per module id via `STUB_FAIL`, `STUB_SKIP`, `STUB_WARN`, `STUB_MISSING` (space-separated ids) and `STUB_MISE_VERSION`. The stub `sudo` logs to `STUB_SUDO_LOG` and exits `STUB_SUDO_EXIT`. Sudo tests skip when run as root.
 

@@ -94,7 +94,7 @@ command -v mise >/dev/null 2>&1 || {
   ui_error "mise is not installed; run the install.sh launcher first"
   exit 2
 }
-mise_version="$(mise --version 2>/dev/null | awk '{print $1; exit}')"
+mise_version="$(mise --version 2>/dev/null | awk 'NR == 1 {print $1}')"
 if [[ -z "$mise_version" || "$(printf '%s\n%s\n' "$MISE_MIN_VERSION" "$mise_version" | sort -V | head -n1)" != "$MISE_MIN_VERSION" ]]; then
   ui_error "mise ${mise_version:-(unknown version)} is too old; need $MISE_MIN_VERSION or newer (run: mise self-update)"
   exit 2
@@ -126,7 +126,7 @@ fi
 
 real_mise_dir="$(apply_mise_config_dir)"
 KEEPALIVE_PID="" DRY_DIR=""
-# shellcheck disable=SC2317 # called by the EXIT trap
+# shellcheck disable=SC2317,SC2329 # called by the EXIT trap
 cleanup() {
   [[ -n "$KEEPALIVE_PID" ]] && kill "$KEEPALIVE_PID" 2>/dev/null
   [[ -n "$DRY_DIR" ]] && rm -rf "$DRY_DIR"

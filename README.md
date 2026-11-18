@@ -6,13 +6,28 @@ Bootstraps my workstation: a fresh **Fedora KDE Plasma** or **Kubuntu** install 
 
 ## Quick start
 
-_(planned)_ One command from a gist:
+One command (the gist link is published once the repo is ready; until then use the repo's raw `install.sh`):
 
 ```bash
-bash -c "$(curl -fsSL <gist-url>/raw/install.sh)"
+bash -c "$(curl -fsSL <gist-url>/raw/install.sh)"                      # bootstrap, then ask about post-bootstrap
+bash -c "$(curl -fsSL <gist-url>/raw/install.sh)" -- --bootstrap --yes  # any dotfiles flags go after --
 ```
 
-It installs git, curl and [mise](https://mise.jdx.dev/), clones this repo to `~/.dotfiles`, runs **bootstrap**, then asks whether to continue with **post-bootstrap**.
+The launcher:
+1. stops with exit 2 on anything but Fedora or Ubuntu/Kubuntu;
+2. installs `git` and `curl` if missing (asks for sudo);
+3. installs [mise](https://mise.jdx.dev/) with its official installer if missing, and stops with exit 2 if it is older than 2026.10.10;
+4. clones this repo to `~/.dotfiles`, or fast-forwards an existing clone. It refuses (exit 2) if the clone has local changes;
+5. links `~/.local/bin/dotfiles` and runs it with your flags.
+
+Running it again is safe: it pulls the latest repo and re-applies. After the first run, use `dotfiles` directly (open a new terminal first; on Kubuntu, log out and back in).
+
+Launcher settings (environment variables): `DOTFILES_BRANCH` (default `main`), `DOTFILES_DIR` (default `~/.dotfiles`), `DOTFILES_REPO`.
+
+> While the repo is under construction, the work lives on `develop`; `main` gets it at the first release. To try it now:
+> ```bash
+> DOTFILES_BRANCH=develop bash -c "$(curl -fsSL https://raw.githubusercontent.com/y0rik/dotfiles/develop/install.sh)" -- --bootstrap
+> ```
 
 ## What it does
 
