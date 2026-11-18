@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+# dotfiles: bootstrap this workstation (see README.md, agentic.md).
+#
+# Exit codes: 0 every selected module ✓ (or skipped) · 1 at least one module
+# ✗ or blocked · 2 usage or precondition error, before anything changed.
+set -euo pipefail
+# shellcheck source-path=SCRIPTDIR/..
+
+readonly MISE_MIN_VERSION="2026.10.10"
+
+SELF="$(readlink -f "${BASH_SOURCE[0]}")"
+# DOTFILES_ROOT: the repo clone (tests point it at a fixture tree).
+DOTFILES_ROOT="${DOTFILES_ROOT:-$(cd "$(dirname "$SELF")/.." && pwd)}"
+LIB="$(cd "$(dirname "$SELF")/../lib" && pwd)"
+
+# shellcheck source=lib/os.sh
+source "$LIB/os.sh"
+# shellcheck source=lib/log.sh
+source "$LIB/log.sh"
+# shellcheck source=lib/ui.sh
+source "$LIB/ui.sh"
+# shellcheck source=lib/toml.sh
+source "$LIB/toml.sh"
+# shellcheck source=lib/config.sh
+source "$LIB/config.sh"
+# shellcheck source=lib/modules.sh
+source "$LIB/modules.sh"
+# shellcheck source=lib/apply.sh
+source "$LIB/apply.sh"
+
+usage() {
+  cat <<'EOF'
+Usage: dotfiles [options]
+
+With no phase option: run bootstrap, then ask before post-bootstrap.
+
+Options:
+  --bootstrap         run the bootstrap phase (no secrets needed)
+  --post-bootstrap    run the post-bootstrap phase (needs 1Password signed in)
+                      Give both to run both phases without asking.
+  --config <file>     use this dotfiles.toml instead of the repo's copy
+  --only <a,b,...>    run only these modules (plus their dependencies);
+                      ignores include/exclude in the config
+  --dry-run           show what mise would change; change nothing
+  --yes               never ask; post-bootstrap runs only if --post-bootstrap is given
+  -h, --help          show this help
+
+Logs: ~/.dotfiles_log/<timestamp>-<phase>.log
+EOF
+}
+
+die_usage() {
+  ui_error "$*"
+  printf 'Run "dotfiles --help" for usage.\n' >&2
+  exit 2
+}
+
+# --- options -------------------------------------------------------------------
+
+ORIG_ARGS=("$@")
+opt_bootstrap=0 opt_post=0 opt_dry=0 opt_yes=0 opt_only="" opt_config=""
+while (($#)); do
+  case "$1" in
+    --bootstrap) opt_bootstrap=1 ;;
+    --post-bootstrap) opt_post=1 ;;
+    --dry-run) opt_dry=1 ;;
+    --yes | -y) opt_yes=1 ;;
+    --only | --config)
+      [[ $# -ge 2 && -n "$2" ]] || die_usage "$1 needs a value"
+      if [[ "$1" == --only ]]; then opt_only="$2"; else opt_config="$2"; fi
+      shift
+      ;;
+    --only=*) opt_only="${1#*=}"; [[ -n "$opt_only" ]] || die_usage "--only needs a value" ;;
+    --config=*) opt_config="${1#*=}"; [[ -n "$opt_config" ]] || die_usage "--config needs a value" ;;
+    -h | --help) usage; exit 0 ;;
+    *) die_usage "unknown option \"$1\"" ;;
+  esac
+  shift
+done
+
+run_bootstrap=1 run_post=0 ask_post=1
+if ((opt_bootstrap || opt_post)); then
+  run_bootstrap=$opt_bootstrap run_post=$opt_post ask_post=0
+elif ((opt_yes)); then
+  ask_post=0 # --yes alone: bootstrap only
+fi
+APPLY_DRY_RUN=$opt_dry
+
+# --- preconditions: nothing changes until all of these pass ------------------------
+
+os="$(os_detect)" || exit 2
+
+command -v mise >/dev/null 2>&1 || {
+  ui_error "mise is not installed; run the install.sh launcher first"
+  exit 2
+}
+mise_version="$(mise --version 2>/dev/null | awk '{print $1; exit}')"
+if [[ -z "$mise_version" || "$(printf '%s\n%s\n' "$MISE_MIN_VERSION" "$mise_version" | sort -V | head -n1)" != "$MISE_MIN_VERSION" ]]; then
+  ui_error "mise ${mise_version:-(unknown version)} is too old; need $MISE_MIN_VERSION or newer (run: mise self-update)"
+  exit 2
+fi
+
+# --only ignores the config file entirely.
+if [[ -z "$opt_only" ]]; then
+  config_load "${opt_config:-$DOTFILES_ROOT/dotfiles.toml}" || exit 2
+fi
+modules_discover "$DOTFILES_ROOT" || exit 2
+
+boot_ids=() post_ids=()
+sel="$(modules_select bootstrap "$opt_only")" || exit 2
+[[ -z "$sel" ]] || mapfile -t boot_ids <<<"$sel"
+sel="$(modules_select post-bootstrap "$opt_only")" || exit 2
+[[ -z "$sel" ]] || mapfile -t post_ids <<<"$sel"
+
+# Modules linked into mise's conf.d and saved as active envs. Normally the
+# config's full selection (both phases). With --only, the links already there
+# are kept too, so a one-off run doesn't drop other modules' tools.
+linked=("${boot_ids[@]}" "${post_ids[@]}")
+if [[ -n "$opt_only" ]]; then
+  managed="$(apply_managed_ids)"
+  [[ -z "$managed" ]] || mapfile -t -O "${#linked[@]}" linked <<<"$managed"
+fi
+if ((${#linked[@]})); then
+  mapfile -t linked < <(printf '%s\n' "${linked[@]}" | sort -u)
+fi
+
+real_mise_dir="$(apply_mise_config_dir)"
+KEEPALIVE_PID="" DRY_DIR=""
+# shellcheck disable=SC2317 # called by the EXIT trap
+cleanup() {
+  [[ -n "$KEEPALIVE_PID" ]] && kill "$KEEPALIVE_PID" 2>/dev/null
+  [[ -n "$DRY_DIR" ]] && rm -rf "$DRY_DIR"
+  return 0
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+
+if ((opt_dry)); then
+  # A dry run reads the modules through a throwaway config dir, so the real
+  # conf.d and miserc stay untouched.
+  DRY_DIR="$(mktemp -d)"
+  APPLY_MISE_DIR="$DRY_DIR"
+else
+  apply_check_links "${linked[@]}" || exit 2
+  APPLY_MISE_DIR="$real_mise_dir"
+  # Package installs need sudo: ask once now, then keep it fresh, so the run
+  # never stops halfway for a password.
+  if ((run_bootstrap && ${#boot_ids[@]} && EUID != 0)); then
+    printf 'sudo is needed to install system packages.\n'
+    sudo -v || { ui_error "sudo failed; nothing was changed"; exit 2; }
+    (while kill -0 "$$" 2>/dev/null; do
+      sudo -n -v || exit 0
+      sleep 50
+    done) </dev/null >/dev/null 2>&1 &
+    KEEPALIVE_PID=$!
+  fi
+fi
+
+apply_links "$APPLY_MISE_DIR/conf.d" "${linked[@]}" || {
+  ui_error "cannot update $APPLY_MISE_DIR/conf.d"
+  exit 1
+}
+
+# --- phases ---------------------------------------------------------------------
+
+any_failed=0
+
+# run_phase <phase> <id>...
+run_phase() {
+  local phase="$1" id header
+  shift
+  log_init "$phase" >/dev/null || { ui_error "cannot write the log"; exit 1; }
+  header="$phase · $os $(os_version) · $# modules · log ${DOTFILES_LOG_FILE/#"$HOME"/\~}"
+  ((opt_dry)) && header+=" · dry run"
+  ui_header "$header"
+  log_line "$header"
+  log_line "dotfiles ${ORIG_ARGS[*]}"
+  apply_reset_phase
+  for id in "$@"; do
+    apply_module "$id"
+  done
+  apply_summary "$#" || any_failed=1
+}
+
+if ((run_bootstrap)); then
+  run_phase bootstrap "${boot_ids[@]}"
+fi
+
+if ((ask_post && ${#post_ids[@]})); then
+  printf '\nContinue to post-bootstrap (needs 1Password signed in)? [y/N] '
+  answer=""
+  read -r answer || answer=""
+  [[ "$answer" =~ ^[Yy]([Ee][Ss])?$ ]] && run_post=1
+  ((run_post)) || printf 'Skipped post-bootstrap. Run "dotfiles --post-bootstrap" later.\n'
+fi
+
+if ((run_post)); then
+  ((run_bootstrap)) && printf '\n'
+  run_phase post-bootstrap "${post_ids[@]}"
+fi
+
+((opt_dry)) || apply_save_env "${linked[@]}" || {
+  ui_error "cannot save the module list to $real_mise_dir/miserc.local.toml"
+  exit 1
+}
+
+exit "$any_failed"

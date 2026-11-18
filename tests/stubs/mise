@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Stub mise for tests/runner.bats. Behaviour per module id comes from env:
+#   STUB_FAIL / STUB_SKIP / STUB_WARN / STUB_MISSING   space-separated ids
+#   STUB_MISE_VERSION                                   version to report
+#   STUB_MISE_LOG                                       every call is appended here
+set -euo pipefail
+
+in_list() { [[ " ${!1:-} " == *" $2 "* ]]; }
+
+printf 'MISE_CONFIG_DIR=%s %s\n' "${MISE_CONFIG_DIR:-}" "$*" >>"${STUB_MISE_LOG:-/dev/null}"
+
+if [[ "${1:-}" == --version ]]; then
+  printf '%s linux-x64 (2026-11-10)\n' "${STUB_MISE_VERSION:-2026.11.9}"
+  exit 0
+fi
+
+id=""
+if [[ "${1:-}" == -E ]]; then id="$2"; shift 2; fi
+[[ "${1:-}" == bootstrap ]] || { echo "stub mise: unsupported call: $*" >&2; exit 64; }
+shift
+
+if [[ "${1:-}" == status ]]; then
+  if in_list STUB_MISSING "$id"; then
+    echo "dnf:wget  missing"
+    exit 1
+  fi
+  exit 0
+fi
+
+# The module must be reachable the way real mise finds it: conf.d/<id>/mise.<id>.toml
+if [[ ! -f "$MISE_CONFIG_DIR/conf.d/$id/mise.$id.toml" ]]; then
+  echo "stub mise: no config for env $id under $MISE_CONFIG_DIR/conf.d" >&2
+  exit 65
+fi
+
+if in_list STUB_FAIL "$id"; then
+  echo "dnf: installing packages for $id"
+  echo "Error: No match for argument: $id-ce"
+  exit 1
+fi
+if in_list STUB_SKIP "$id"; then
+  echo "SKIP: no NVIDIA GPU"
+  echo "mise ERROR task bootstrap failed with exit code 3"
+  exit 3
+fi
+if in_list STUB_WARN "$id"; then
+  echo "mise WARN  unknown field \`pakages\` in mise.$id.toml"
+fi
+echo "applied $id $*"

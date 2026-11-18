@@ -23,17 +23,18 @@ It installs git, curl and [mise](https://mise.jdx.dev/), clones this repo to `~/
 
 ## Usage
 
-_(planned)_
-
 ```bash
-dotfiles                    # bootstrap, then ask about post-bootstrap
-dotfiles --bootstrap        # bootstrap only
-dotfiles --post-bootstrap   # post-bootstrap only
-dotfiles --config <file>    # use your own copy of dotfiles.toml
-dotfiles --only <a,b>       # run only these modules this time
-dotfiles --dry-run          # show what would change
-dotfiles --yes              # no prompts (skips post-bootstrap unless asked for)
+dotfiles                                    # bootstrap, then ask about post-bootstrap
+dotfiles --bootstrap                        # bootstrap only
+dotfiles --post-bootstrap                   # post-bootstrap only
+dotfiles --bootstrap --post-bootstrap       # both, without asking
+dotfiles --config <file>                    # use your own copy of dotfiles.toml
+dotfiles --only <a,b>                       # run only these modules (and what they need) this time
+dotfiles --dry-run                          # show what would change, change nothing
+dotfiles --yes                              # no prompts; skips post-bootstrap unless --post-bootstrap is given
 ```
+
+Bootstrap asks for your sudo password once at the start, so the run never stops halfway to ask again.
 
 ## Choosing what gets installed
 
@@ -47,7 +48,7 @@ exclude = ["nvidia"]       # install everything EXCEPT these modules
 - Values are module ids: the folder names under `modules/` and `post-bootstrap/`.
 - `dotfiles --only a,b` works like `include` for one run and ignores the file.
 - Mistakes stop the run **before anything is installed**: setting both lists, an unknown module id (the error lists the valid ones), a misspelled key such as `includes`, or excluding a module that another selected module needs.
-- To customise: download `dotfiles.toml`, edit it, and run with `--config <your-file>` _(flag planned)_.
+- To customise: download `dotfiles.toml`, edit it, and run with `--config <your-file>`.
 
 ## Modules
 
@@ -59,7 +60,19 @@ _(planned)_ Each tool's version is a line in its module's `mise.<id>.toml`, `"la
 
 ## Logs and results
 
-Every module prints ✓, ✗, `skipped` or `blocked`. If any module fails, the run still finishes the others, prints a summary and exits with 1.
+Every module gets one line:
+
+```
+bootstrap · fedora 45 · 4 modules · log ~/.dotfiles_log/2026-11-18T09-40-00-bootstrap.log
+  ✓ base                 3s
+  ✓ cli                  8s
+  ✗ docker               2s   Error: No match for argument: docker-ce
+  ✗ kubernetes           0s   blocked by docker
+FAILED: 1 of 4 modules (docker); blocked: kubernetes. See log.
+```
+
+- ✓ installed and verified; ✗ failed; `blocked by X`: not attempted because X failed; `skipped: reason`: doesn't apply on this machine (e.g. no NVIDIA GPU), not a failure.
+- If any module fails, the run still finishes the others, prints the summary and exits with **1**. Exit **2** means it stopped before changing anything (unsupported OS, old mise, bad config or flag).
 
 Full output of every run: `~/.dotfiles_log/<timestamp>-<phase>.log`. It lives next to `~/.dotfiles`, not inside it, so re-cloning the repo keeps old logs.
 

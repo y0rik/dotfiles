@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Stub sudo for tests/runner.bats: records the call and succeeds.
+printf 'sudo %s\n' "$*" >>"${STUB_SUDO_LOG:-/dev/null}"
+exit "${STUB_SUDO_EXIT:-0}"

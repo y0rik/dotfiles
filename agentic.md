@@ -20,7 +20,7 @@ Two phases:
 | **post-bootstrap** | yes (1Password) | SSH public keys, `~/.ssh/config`, 1Password SSH agent, git commit signing |
 
 - **mise does the installing** (≥ 2026.10.10): `[tools]`, `[bootstrap.packages]`, `[dotfiles]`, `[bootstrap.hooks]`, `[tasks.bootstrap]`.
-- **`bin/dotfiles` orchestrates** _(planned)_: OS check, module selection, one `mise -E <id> bootstrap --yes` per module, a ✓ / ✗ / skipped / blocked line per module, a log, a summary, and the exit code.
+- **`bin/dotfiles` orchestrates**: OS check, module selection, one `mise -E <id> bootstrap --yes` per module, a ✓ / ✗ / skipped / blocked line per module, a log, a summary, and the exit code.
 - **One module = one folder**, a mise config fragment named `mise.<id>.toml`, loaded only when mise environment `<id>` is active. `~/.config/mise/conf.d/` holds one link per selected module.
 - **A failed module is a failure, never a warning.** The run continues with independent modules and exits 1 at the end.
 
@@ -30,7 +30,7 @@ Modelled on [TechDufus/dotfiles](https://github.com/TechDufus/dotfiles) (`main`)
 
 ```
 install.sh            → gist launcher (planned)
-bin/dotfiles          → runner (planned)
+bin/dotfiles          → runner: flags, preconditions, phases, prompt, exit code
 dotfiles.toml         → which modules run: include / exclude
 lib/os.sh             → os_detect (fedora|ubuntu, else exit 2), os_version, os_codename
 lib/log.sh            → log_init <phase>, log_module_start/end, log_capture, log_line
@@ -38,9 +38,10 @@ lib/ui.sh             → ui_status <ok|fail|skipped|blocked> <module> <seconds>
 lib/toml.sh           → toml_query, toml_check_keys, toml_string_list (mikefarah yq v4; falls back to `mise exec yq@4`)
 lib/config.sh         → config_load <file> → CONFIG_INCLUDE / CONFIG_EXCLUDE
 lib/modules.sh        → modules_discover <root>, modules_select <phase> [only-csv] → ordered ids
+lib/apply.sh          → conf.d links, apply_module <id> (mise call + status), apply_save_env, apply_summary
 modules/<id>/         → bootstrap-phase modules
 post-bootstrap/<id>/  → post-bootstrap-phase modules
-tests/                → bats unit tests, helpers.bash (mkmod fixture builder), fixtures, Dockerfile (bats + yq)
+tests/                → bats tests, helpers.bash (mkmod fixture builder), fixtures, stubs/ (fake mise, sudo), Dockerfile (bats + yq)
 .github/workflows/    → CI
 README.md             → user documentation
 agentic.md            → this file
@@ -50,7 +51,23 @@ Run logs go to `~/.dotfiles_log/<ISO-timestamp>-<phase>.log`, outside the repo.
 
 ## How a run works
 
-_(planned, Task 4)_
+`bin/dotfiles` (`lib/apply.sh` does the per-module work):
+
+1. **Preconditions, nothing changed yet** (any failure → exit 2): parse flags; supported OS; `mise` ≥ 2026.10.10; load `dotfiles.toml` (skipped with `--only`); discover modules; select both phases; check nothing foreign sits where a `conf.d` link goes; `sudo -v` once if bootstrap runs as non-root (kept fresh in the background until exit).
+2. **Links:** `~/.config/mise/conf.d/` (or `$MISE_CONFIG_DIR/conf.d`) gets one link per module, `conf.d/<id> -> <repo>/modules/<id>`. The set is the config's selection for **both** phases; with `--only`, existing links are kept and the `--only` modules added, so a one-off run doesn't drop other tools. Links into this repo that aren't in the set are removed; anything else in `conf.d` is left alone. An old single `conf.d -> modules` link is replaced by a folder.
+3. **Per module, in dependency order:**
+   - a dependency that failed or was blocked → `blocked by <dep>`, not attempted; a skipped dependency → `skipped: needs <dep>`.
+   - `mise -E <id> bootstrap --yes` from `$HOME`, `NO_COLOR=1`, output into the log.
+   - exit 0 → `mise -E <id> bootstrap status --missing` must also pass, else ✗ "still missing after apply".
+   - exit 3 → `skipped`; the reason shown is the text after the module's last `SKIP:` line.
+   - any other exit → ✗ with the last error-looking output line.
+   - a mise `WARN … unknown field` / `… is required` line → ✗ even on exit 0 (mise ignores that part of the module).
+4. **Phases:** bootstrap, then the prompt `Continue to post-bootstrap …? [y/N]` (only if post-bootstrap modules are selected; EOF = no). `--yes` alone = bootstrap only. `--bootstrap` / `--post-bootstrap` pick phases explicitly; both = both, no prompt. Statuses carry across phases, so a failed `base` blocks `ssh`.
+5. **After:** each phase prints `OK: N modules (k skipped)` or `FAILED: k of N modules (…); blocked: …. See log.` The linked set is saved as `env = [...]` in `miserc.local.toml` (only that line is owned; other lines kept), even when modules failed. Exit 1 if anything in any phase was ✗ or blocked.
+
+`--dry-run`: no sudo, links built in a temporary `MISE_CONFIG_DIR` (deleted at exit), `mise … bootstrap --yes --dry-run` per module, no `status` check, no env save. Only the log is written.
+
+One log per phase: `~/.dotfiles_log/<timestamp>-<phase>.log`, with the header, the command line, every mise call and its output framed `=== <id> START … ===` / `=== <id> END <status> ===`, and the summary.
 
 ## Selecting modules
 
@@ -65,7 +82,7 @@ _(planned, Task 4)_
 
 ## Adding or changing a module
 
-_(full template planned, Tasks 4–6)_
+_(full template planned, Tasks 5–6)_
 
 A module is a folder `modules/<id>/` (bootstrap) or `post-bootstrap/<id>/` with:
 
@@ -82,13 +99,15 @@ Rules already fixed:
 - Use **real** package names. Virtual names (Fedora's `wget` → `wget2-wget`) break safe re-runs.
 - Fedora vendor repos: add them in a `[bootstrap.hooks] pre-packages` hook with a file-exists guard (`[bootstrap.dnf.repos]` is COPR only).
 - Ubuntu vendor repos: `[bootstrap.apt.sources]` needs `key` **and** `fingerprint`, otherwise mise skips the source with only a warning.
-- Anything imperative goes in `[tasks.bootstrap]` (run last), with `skip_if` where an "already done" check is cheap. Exit 3 means "does not apply here" (`skipped`).
+- Anything imperative goes in `[tasks.bootstrap]` (run last), with `skip_if` where an "already done" check is cheap.
+- "Does not apply on this machine" (no NVIDIA GPU, …): print `SKIP: <reason>` and `exit 3`. The runner shows `skipped: <reason>`; it is not a failure.
 
 ## Conventions
 
 - Bash, `set -euo pipefail` in executables; libraries in `lib/` are sourced and only define functions.
 - Functions `snake_case`; private helpers start with `_`.
 - Never hide a failure: no `|| true` / `exit 0` around steps that can fail.
+- `bin/dotfiles` runs under `set -e`, and so do the library functions it calls: use `sed -n …p`, not `grep`, to look for text that may be absent.
 - Parse files, don't source them, when their content isn't ours (see `_os_field`).
 - Colour only on a terminal; `NO_COLOR` disables it, `DOTFILES_COLOR=always|never` overrides.
 
@@ -96,18 +115,21 @@ Rules already fixed:
 
 ```bash
 bats tests/                        # unit tests (needs mikefarah yq v4 on PATH)
-shellcheck -x lib/*.sh             # lint
+shellcheck -x lib/*.sh bin/dotfiles tests/stubs/*   # lint
 # Without local installs:
 docker build -q -t dotfiles-test tests/
 docker run --rm -v "$PWD:/code:ro" -w /code dotfiles-test tests/
-docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:v0.10.0 -x lib/*.sh
+docker run --rm --user 1000:1000 -v "$PWD:/code:ro" -w /code dotfiles-test tests/   # also runs the sudo tests
+docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:v0.10.0 -x lib/*.sh bin/dotfiles tests/stubs/*
 ```
 
 Fixture modules are built per test with `mkmod <root> <bootstrap|post-bootstrap> <id> [dep...]` from `tests/helpers.bash`.
 
+`tests/runner.bats` runs the real `bin/dotfiles` against a fixture tree (`DOTFILES_ROOT`) and a temporary `HOME`, with `tests/stubs/` first on `PATH`. The stub `mise` only answers for modules reachable as `$MISE_CONFIG_DIR/conf.d/<id>/mise.<id>.toml`, logs every call to `STUB_MISE_LOG`, and misbehaves per module id via `STUB_FAIL`, `STUB_SKIP`, `STUB_WARN`, `STUB_MISSING` (space-separated ids) and `STUB_MISE_VERSION`. The stub `sudo` logs to `STUB_SUDO_LOG` and exits `STUB_SUDO_EXIT`. Sudo tests skip when run as root.
+
 CI (`.github/workflows/ci.yml`) runs shellcheck and bats on every push to `develop`/`main` and on PRs. Container integration runs on Fedora and Ubuntu, plus a re-run check, are _(planned, Task 6)_.
 
-Test hooks: `DOTFILES_OS_RELEASE` (os-release path), `DOTFILES_LOG_DIR` (log directory), `DOTFILES_COLOR`, `DOTFILES_YQ` (yq command).
+Test hooks: `DOTFILES_ROOT` (repo/module tree), `DOTFILES_OS_RELEASE` (os-release path), `DOTFILES_LOG_DIR` (log directory), `DOTFILES_COLOR`, `DOTFILES_YQ` (yq command), `MISE_CONFIG_DIR` (mise's config dir, as mise itself reads it).
 
 Libraries are sourced from inside functions in tests, so their global variables are declared with `declare -g`.
 
