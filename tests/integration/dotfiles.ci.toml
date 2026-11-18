@@ -1,0 +1,5 @@
+# dotfiles.toml for CI containers (no systemd, no GUI, no GPU).
+# Add GUI/hardware modules here as they are created (plasma, nvidia,
+# desktop-apps, virtualization, 1password, vscode, obsidian, insomnia):
+# unknown ids are an error, so only list modules that exist.
+exclude = []

@@ -1,0 +1,22 @@
+# modules/base: core packages. Loaded only under `mise -E base` (see agentic.md).
+#
+# Use REAL package names: a virtual name (Fedora's "wget" is provided by
+# "wget2-wget") is never reported as installed, so it would reinstall every run.
+
+min_version = "2026.10.10"
+
+[bootstrap.packages]
+git = "latest"
+curl = "latest"
+wget = { names = { apt = "wget", dnf = "wget2-wget" } }
+gnupg = { names = { apt = "gnupg", dnf = "gnupg2" } }
+ca-certificates = "latest"
+tar = "latest"
+unzip = "latest"
+tree = "latest"
+rsync = "latest"
+nano = "latest"
+
+[tasks.bootstrap]
+description = "Check the coreutils the scripts rely on"
+run = "command -v realpath && command -v dirname"

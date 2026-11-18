@@ -60,6 +60,24 @@ links() { (cd "$MISE_DIR/conf.d" && ls) | tr '\n' ' ' | sed 's/ $//'; }
   [ "$(applied)" = "base cli docker" ]
 }
 
+@test "the ✗ detail is the package manager's error, not mise's generic footer" {
+  STUB_FAIL=docker run dotfiles --bootstrap
+  [[ "$output" == *"✗ docker"*"   Error: No match for argument: docker-ce"* ]]
+  [[ "$output" != *"Run with --verbose"* ]]
+}
+
+@test "without a tool error line, the ✗ detail is mise's own last ERROR" {
+  STUB_TASKFAIL=cli run dotfiles --bootstrap
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"✗ cli"*"mise ERROR task bootstrap failed: exit code 7"* ]]
+}
+
+@test "one module is counted as \"1 module\"" {
+  run dotfiles --bootstrap --only base
+  [[ "$output" == *"· 1 module · log"* ]]
+  [[ "$output" == *"OK: 1 module"* ]]
+}
+
 @test "the log frames every module with START/END and holds mise output" {
   STUB_FAIL=docker run dotfiles --bootstrap
   log="$(ls "$DOTFILES_LOG_DIR"/*-bootstrap.log)"

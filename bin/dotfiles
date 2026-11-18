@@ -170,7 +170,7 @@ run_phase() {
   local phase="$1" id header
   shift
   log_init "$phase" >/dev/null || { ui_error "cannot write the log"; exit 1; }
-  header="$phase · $os $(os_version) · $# modules · log ${DOTFILES_LOG_FILE/#"$HOME"/\~}"
+  header="$phase · $os $(os_version) · $# $(_apply_noun "$#") · log ${DOTFILES_LOG_FILE/#"$HOME"/\~}"
   ((opt_dry)) && header+=" · dry run"
   ui_header "$header"
   log_line "$header"

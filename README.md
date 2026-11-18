@@ -67,7 +67,11 @@ exclude = ["nvidia"]       # install everything EXCEPT these modules
 
 ## Modules
 
-_(planned)_ Module table.
+| Module | Phase | Installs | Needs |
+|---|---|---|---|
+| `base` | bootstrap | git, curl, wget, gnupg, ca-certificates, tar, unzip, tree, rsync, nano | — |
+
+_(More modules are being added.)_
 
 ## Pinning a version
 

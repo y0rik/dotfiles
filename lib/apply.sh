@@ -107,14 +107,17 @@ apply_save_env() {
 
 # _apply_detail <output-file> <kind>: one short reason for the status line.
 #   skip: text after the last "SKIP:" line (modules print it before exit 3)
-#   fail: the last line that looks like an error, else the last line
+#   fail: the last error-looking line from the tool mise ran (dnf, apt, a
+#         task); else mise's own last ERROR line, minus its generic footer
+#         ("Version: …", "Run with --verbose …"); else the last line.
 _apply_detail() {
   local file="$1" kind="$2" line=""
   # sed, not grep: "no match" must not count as an error under set -e.
   if [[ "$kind" == skip ]]; then
     line="$(sed -n -E 's/.*SKIP:[[:space:]]*//p' "$file" | tail -n1)"
   else
-    line="$(sed -n -E '/[Ee][Rr][Rr][Oo][Rr]|[Ff]ailed|[Nn]o match|[Nn]ot found|[Uu]nable|[Cc]annot/p' "$file" | tail -n1)"
+    line="$(sed -n -E '/^mise ERROR/d; /^E: |[Ee][Rr][Rr][Oo][Rr]|[Ff]ailed|[Nn]o match|[Nn]ot found|[Uu]nable|[Cc]annot/p' "$file" | tail -n1)"
+    [[ -n "$line" ]] || line="$(sed -n -E '/^mise ERROR (Version:|Run with)/d; /^mise ERROR/p' "$file" | tail -n1)"
     [[ -n "$line" ]] || line="$(sed -n '/[^[:space:]]/p' "$file" | tail -n1)"
   fi
   line="${line#"${line%%[![:space:]]*}"}"
@@ -207,6 +210,8 @@ apply_module() {
   rm -f "$out"
 }
 
+_apply_noun() { if (($1 == 1)); then printf 'module'; else printf 'modules'; fi; }
+
 # apply_reset_phase: start counting a new phase (statuses of earlier phases
 # are kept, so a post-bootstrap module sees a failed bootstrap dependency).
 apply_reset_phase() {
@@ -215,10 +220,11 @@ apply_reset_phase() {
 
 # apply_summary <total>: the run's last line. Returns 1 if anything failed.
 apply_summary() {
-  local total="$1" failed blocked msg
+  local total="$1" failed blocked msg noun
+  noun="$(_apply_noun "$total")"
   if ((${#APPLY_FAILED[@]} + ${#APPLY_BLOCKED[@]})); then
     failed="$(printf '%s, ' "${APPLY_FAILED[@]}")"
-    msg="FAILED: ${#APPLY_FAILED[@]} of $total modules (${failed%, })"
+    msg="FAILED: ${#APPLY_FAILED[@]} of $total $noun (${failed%, })"
     if ((${#APPLY_BLOCKED[@]})); then
       blocked="$(printf '%s, ' "${APPLY_BLOCKED[@]}")"
       msg+="; blocked: ${blocked%, }"
@@ -227,7 +233,7 @@ apply_summary() {
     log_line "$msg"
     return 1
   fi
-  msg="OK: $total modules"
+  msg="OK: $total $noun"
   ((${#APPLY_SKIPPED[@]})) && msg+=" (${#APPLY_SKIPPED[@]} skipped)"
   printf '%s\n' "$(_ui_paint 32 "$msg")"
   log_line "$msg"

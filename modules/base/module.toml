@@ -1,0 +1,2 @@
+description = "Core command-line packages every other module relies on: git, curl, wget, gnupg, certificates, archives, rsync, nano"
+depends = []

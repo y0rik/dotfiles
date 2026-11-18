@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Stub mise for tests/runner.bats. Behaviour per module id comes from env:
-#   STUB_FAIL / STUB_SKIP / STUB_WARN / STUB_MISSING   space-separated ids
+#   STUB_FAIL / STUB_TASKFAIL / STUB_SKIP / STUB_WARN / STUB_MISSING   space-separated ids
 #   STUB_MISE_VERSION                                   version to report
 #   STUB_MISE_LOG                                       every call is appended here
 set -euo pipefail
@@ -35,8 +35,19 @@ fi
 
 if in_list STUB_FAIL "$id"; then
   echo "dnf: installing packages for $id"
+  echo "Failed to resolve the transaction:"
   echo "Error: No match for argument: $id-ce"
+  echo "mise ERROR dnf exited with non-zero status: exit code 1"
+  echo "mise ERROR Version: 2026.11.9 linux-x64 (2026-11-16)"
+  echo "mise ERROR Run with --verbose or MISE_VERBOSE=1 for more information"
   exit 1
+fi
+if in_list STUB_TASKFAIL "$id"; then
+  echo "mise bootstrap: running \`bootstrap\` task"
+  echo "mise ERROR task bootstrap failed: exit code 7"
+  echo "mise ERROR Version: 2026.11.9 linux-x64 (2026-11-16)"
+  echo "mise ERROR Run with --verbose or MISE_VERBOSE=1 for more information"
+  exit 7
 fi
 if in_list STUB_SKIP "$id"; then
   echo "SKIP: no NVIDIA GPU"

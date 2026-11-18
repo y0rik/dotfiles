@@ -86,21 +86,38 @@ One log per phase: `~/.dotfiles_log/<timestamp>-<phase>.log`, with the header, t
 
 ## Adding or changing a module
 
-_(full template planned, Tasks 5–6)_
-
-A module is a folder `modules/<id>/` (bootstrap) or `post-bootstrap/<id>/` with:
+A module is a folder `modules/<id>/` (bootstrap) or `post-bootstrap/<id>/` with two files. `modules/base/` is the reference example.
 
 ```toml
 # module.toml (required; only these two keys are allowed)
 description = "Docker Engine, lazydocker, dive"
-depends = ["base"]
+depends = ["base"]          # every module except base depends on base
 ```
 
-Rules already fixed:
+```toml
+# mise.<id>.toml: what mise applies under `mise -E <id> bootstrap`
+[bootstrap.packages]
+git = "latest"                                           # same name on both distros
+wget = { names = { apt = "wget", dnf = "wget2-wget" } }  # names differ per distro
+
+[tools]
+jq = "latest"               # pin by replacing "latest" with a version
+
+[tasks.bootstrap]           # optional, runs last, every run: keep it safe to repeat
+run = "command -v realpath"
+```
+
+Steps:
+1. Create the folder and both files; add the module to the README module table.
+2. Check it: `docker run --rm -v "$PWD:/src:ro" fedora:latest bash /src/tests/integration/run.sh` needs the commit on a `ci-under-test` branch, so the simplest path is to push and let CI run it on both distros. For a quick look in a container: install mise, link the folder into `~/.config/mise/conf.d/<id>`, run `mise -E <id> bootstrap plan`, then `mise -E <id> bootstrap --yes`.
+3. GUI or hardware module (no systemd/GUI/GPU in containers)? Add it to `exclude` in `tests/integration/dotfiles.ci.toml`.
+
+Rules:
 - The folder name is the module id: lowercase letters, digits, dashes. An id can exist in only one phase, and every folder there must have a `module.toml`.
 - The mise config file is `<folder>/mise.<id>.toml`.
 - Versions sit in that file, `"latest"` by default; pin by editing the line.
-- Use **real** package names. Virtual names (Fedora's `wget` → `wget2-wget`) break safe re-runs.
+- Use **real** package names. Virtual names (Fedora's `wget` → `wget2-wget`) are never reported installed, so they reinstall every run; CI's "nothing left to change" check fails on them.
+- `"latest"` for a package means "installed, any version": re-runs don't upgrade system packages (no implicit full upgrades).
 - Fedora vendor repos: add them in a `[bootstrap.hooks] pre-packages` hook with a file-exists guard (`[bootstrap.dnf.repos]` is COPR only).
 - Ubuntu vendor repos: `[bootstrap.apt.sources]` needs `key` **and** `fingerprint`, otherwise mise skips the source with only a warning.
 - Anything imperative goes in `[tasks.bootstrap]` (run last), with `skip_if` where an "already done" check is cheap.
@@ -119,21 +136,23 @@ Rules already fixed:
 
 ```bash
 bats tests/                        # unit tests (needs mikefarah yq v4 on PATH)
-shellcheck -x install.sh lib/*.sh bin/dotfiles tests/stubs/*   # lint (CI pins v0.11.0)
+shellcheck -x install.sh lib/*.sh bin/dotfiles tests/stubs/* tests/integration/*.sh   # lint (CI pins v0.11.0)
 # Without local installs:
 docker build -q -t dotfiles-test tests/
 docker run --rm -v "$PWD:/code:ro" -w /code dotfiles-test tests/
 docker run --rm --user 1000:1000 -v "$PWD:/code:ro" -w /code dotfiles-test tests/   # also runs the sudo tests
-docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:v0.11.0 -x install.sh lib/*.sh bin/dotfiles tests/stubs/*
+docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:v0.11.0 -x install.sh lib/*.sh bin/dotfiles tests/stubs/* tests/integration/*.sh
 ```
 
 Fixture modules are built per test with `mkmod <root> <bootstrap|post-bootstrap> <id> [dep...]` from `tests/helpers.bash`.
 
 `tests/install.bats` runs `install.sh` offline: `DOTFILES_REPO` is a local fixture repo whose `bin/dotfiles` only records its arguments, and the stub `mise` stands in for the real one (one test fakes `curl` to check the mise install path). Installing git/curl with dnf/apt is checked by hand in `fedora:latest` / `ubuntu:rolling` containers.
 
-`tests/runner.bats` runs the real `bin/dotfiles` against a fixture tree (`DOTFILES_ROOT`) and a temporary `HOME`, with `tests/stubs/` first on `PATH`. The stub `mise` only answers for modules reachable as `$MISE_CONFIG_DIR/conf.d/<id>/mise.<id>.toml`, logs every call to `STUB_MISE_LOG`, and misbehaves per module id via `STUB_FAIL`, `STUB_SKIP`, `STUB_WARN`, `STUB_MISSING` (space-separated ids) and `STUB_MISE_VERSION`. The stub `sudo` logs to `STUB_SUDO_LOG` and exits `STUB_SUDO_EXIT`. Sudo tests skip when run as root.
+`tests/runner.bats` runs the real `bin/dotfiles` against a fixture tree (`DOTFILES_ROOT`) and a temporary `HOME`, with `tests/stubs/` first on `PATH`. The stub `mise` only answers for modules reachable as `$MISE_CONFIG_DIR/conf.d/<id>/mise.<id>.toml`, logs every call to `STUB_MISE_LOG`, and misbehaves per module id via `STUB_FAIL` (dnf-style error plus mise's footer), `STUB_TASKFAIL`, `STUB_SKIP`, `STUB_WARN`, `STUB_MISSING` (space-separated ids) and `STUB_MISE_VERSION`. The stub `sudo` logs to `STUB_SUDO_LOG` and exits `STUB_SUDO_EXIT`. Sudo tests skip when run as root.
 
-CI (`.github/workflows/ci.yml`) runs shellcheck and bats on every push to `develop`/`main` and on PRs. Container integration runs on Fedora and Ubuntu, plus a re-run check, are _(planned, Task 6)_.
+CI (`.github/workflows/ci.yml`) on every push to `develop`/`main` and on PRs:
+- `shellcheck` (pinned image) and `bats`;
+- `integration (fedora:latest | ubuntu:rolling)`, after both pass: the commit is put on branch `ci-under-test`, mounted read-only at `/src` in a fresh container, and `tests/integration/run.sh` runs the real launcher (`DOTFILES_REPO=/src`) with `tests/integration/dotfiles.ci.toml`, then checks `mise -E <id> bootstrap plan` shows `0 create, 0 update, … 0 remove` for every applied module, then re-runs `dotfiles`. On failure it prints the run logs.
 
 Test hooks: `DOTFILES_ROOT` (repo/module tree), `DOTFILES_OS_RELEASE` (os-release path), `DOTFILES_LOG_DIR` (log directory), `DOTFILES_COLOR`, `DOTFILES_YQ` (yq command), `MISE_CONFIG_DIR` (mise's config dir, as mise itself reads it).
 
