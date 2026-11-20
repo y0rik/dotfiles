@@ -1,0 +1,2 @@
+description = "Everyday command-line tools through mise: jq, yq, fzf, bat, btop, xh, lnav, hunk"
+depends = ["base"]

@@ -1,0 +1,15 @@
+# From mise's registry, so names and versions are the same on both distros
+# (Ubuntu's own bat package installs `batcat`).
+[tools]
+jq = "latest"
+yq = "latest"
+fzf = "latest"
+bat = "latest"
+btop = "latest"
+xh = "latest"
+lnav = "latest"
+hunk = "latest"
+
+[tasks.bootstrap]
+description = "Check every tool runs by its usual name"
+run = "jq --version && yq --version && fzf --version && bat --version && btop --version && xh --version && lnav -V && hunk --version"

@@ -72,6 +72,8 @@ exclude = ["nvidia"]       # install everything EXCEPT these modules
 | `base` | bootstrap | git, curl, wget, gnupg, ca-certificates, tar, unzip, tree, rsync, nano | — |
 | `mise` | bootstrap | usage (for mise's bash completion); mise itself comes from `install.sh` | base |
 | `bash` | bootstrap | `~/.bash_bootstrap` (PATH, mise activation and completion, oh-my-posh prompt), one line in `~/.bashrc` that sources it; oh-my-posh | base, mise |
+| `network` | bootstrap | openssl, dig, tcpdump, traceroute, iperf3, nmap, whois (distro packages) | base |
+| `cli` | bootstrap | jq, yq, fzf, bat, btop, xh, lnav, hunk (mise, same names on both distros) | base |
 
 _(More modules are being added.)_
 

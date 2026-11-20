@@ -126,6 +126,8 @@ Rules:
 - Ubuntu vendor repos: `[bootstrap.apt.sources]` needs `key` **and** `fingerprint`, otherwise mise skips the source with only a warning.
 - Dotfiles are **symlinks into the repo** (`~/.x -> ~/.config/mise/conf.d/<id>/files/x`), so editing the repo copy takes effect at once. To add a line to a file you don't own (`~/.bashrc`), use a `{ line = … }` entry with a unique name after the file path; mise adds it once.
 - Shell setup goes in `modules/bash/files/bash_bootstrap` (sourced from `~/.bashrc`): it puts `~/.local/bin` on PATH, then, in interactive shells only, activates mise (plus `mise hook-env`, so tools are on PATH right away), mise completion and the oh-my-posh prompt. Guard each tool with `command -v`, so a missing tool never breaks a new shell.
+- Prefer `[tools]` (mise registry) for CLI tools: same name and version on both distros. Use `[bootstrap.packages]` for what the registry lacks or what belongs to the system (network tools, libraries).
+- End a module with a `[tasks.bootstrap]` that checks each tool by the name you type (`command -v dig`, `bat --version`): it catches a package that installs a different binary name (Ubuntu's `batcat`).
 - Anything imperative goes in `[tasks.bootstrap]` (run last), with `skip_if` where an "already done" check is cheap.
 - "Does not apply on this machine" (no NVIDIA GPU, …): print `SKIP: <reason>` and `exit 3`. The runner shows `skipped: <reason>`; it is not a failure.
 

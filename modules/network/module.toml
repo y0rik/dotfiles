@@ -1,0 +1,2 @@
+description = "Network tools from the distro: openssl, dig, tcpdump, traceroute, iperf3, nmap, whois"
+depends = ["base"]

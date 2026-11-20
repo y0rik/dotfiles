@@ -1,0 +1,12 @@
+[bootstrap.packages]
+openssl = "latest"
+dig = { names = { apt = "bind9-dnsutils", dnf = "bind-utils" } }
+tcpdump = "latest"
+traceroute = "latest"
+iperf3 = "latest"
+nmap = "latest"
+whois = "latest"
+
+[tasks.bootstrap]
+description = "Check every tool is on PATH by its usual name"
+run = "for t in openssl dig tcpdump traceroute iperf3 nmap whois; do command -v $t >/dev/null || { echo \"missing: $t\" >&2; exit 1; }; done"
