@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v7
       - name: shellcheck all bash (pinned image, same as local runs)
         run: |
-          mapfile -t files < <(git ls-files 'lib/*.sh' 'bin/*' 'install.sh' 'modules/**/*.sh' 'post-bootstrap/**/*.sh' 'tests/stubs/*' 'tests/integration/*.sh')
+          mapfile -t files < <(git ls-files 'lib/*.sh' 'bin/*' 'install.sh' 'modules/**/*.sh' 'post-bootstrap/**/*.sh' 'tests/stubs/*' 'tests/integration/*.sh' 'modules/bash/files/bash_bootstrap')
           echo "checking ${#files[@]} files"
           docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:v0.11.0 -x "${files[@]}"
 

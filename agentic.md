@@ -39,7 +39,7 @@ lib/toml.sh           → toml_query, toml_check_keys, toml_string_list (mikefar
 lib/config.sh         → config_load <file> → CONFIG_INCLUDE / CONFIG_EXCLUDE
 lib/modules.sh        → modules_discover <root>, modules_select <phase> [only-csv] → ordered ids
 lib/apply.sh          → conf.d links, apply_module <id> (mise call + status), apply_save_env, apply_summary
-modules/<id>/         → bootstrap-phase modules
+modules/<id>/         → bootstrap-phase modules (module.toml, mise.<id>.toml, optional files/ for dotfiles)
 post-bootstrap/<id>/  → post-bootstrap-phase modules
 tests/                → bats tests, helpers.bash (mkmod fixture builder), fixtures, stubs/ (fake mise, sudo), Dockerfile (bats, yq, git, curl)
 .github/workflows/    → CI
@@ -103,6 +103,10 @@ wget = { names = { apt = "wget", dnf = "wget2-wget" } }  # names differ per dist
 [tools]
 jq = "latest"               # pin by replacing "latest" with a version
 
+[dotfiles]                  # paths in $HOME; sources relative to the module folder
+"~/.config/jq/x" = "files/x"                                   # symlink into the repo
+"~/.bashrc/my-line" = { line = 'source ~/.something' }          # one line, added once
+
 [tasks.bootstrap]           # optional, runs last, every run: keep it safe to repeat
 run = "command -v realpath"
 ```
@@ -120,6 +124,8 @@ Rules:
 - `"latest"` for a package means "installed, any version": re-runs don't upgrade system packages (no implicit full upgrades).
 - Fedora vendor repos: add them in a `[bootstrap.hooks] pre-packages` hook with a file-exists guard (`[bootstrap.dnf.repos]` is COPR only).
 - Ubuntu vendor repos: `[bootstrap.apt.sources]` needs `key` **and** `fingerprint`, otherwise mise skips the source with only a warning.
+- Dotfiles are **symlinks into the repo** (`~/.x -> ~/.config/mise/conf.d/<id>/files/x`), so editing the repo copy takes effect at once. To add a line to a file you don't own (`~/.bashrc`), use a `{ line = … }` entry with a unique name after the file path; mise adds it once.
+- Shell setup goes in `modules/bash/files/bash_bootstrap` (sourced from `~/.bashrc`): it puts `~/.local/bin` on PATH, then, in interactive shells only, activates mise (plus `mise hook-env`, so tools are on PATH right away), mise completion and the oh-my-posh prompt. Guard each tool with `command -v`, so a missing tool never breaks a new shell.
 - Anything imperative goes in `[tasks.bootstrap]` (run last), with `skip_if` where an "already done" check is cheap.
 - "Does not apply on this machine" (no NVIDIA GPU, …): print `SKIP: <reason>` and `exit 3`. The runner shows `skipped: <reason>`; it is not a failure.
 
@@ -136,12 +142,12 @@ Rules:
 
 ```bash
 bats tests/                        # unit tests (needs mikefarah yq v4 on PATH)
-shellcheck -x install.sh lib/*.sh bin/dotfiles tests/stubs/* tests/integration/*.sh   # lint (CI pins v0.11.0)
+shellcheck -x install.sh lib/*.sh bin/dotfiles tests/stubs/* tests/integration/*.sh modules/bash/files/bash_bootstrap   # lint (CI pins v0.11.0)
 # Without local installs:
 docker build -q -t dotfiles-test tests/
 docker run --rm -v "$PWD:/code:ro" -w /code dotfiles-test tests/
 docker run --rm --user 1000:1000 -v "$PWD:/code:ro" -w /code dotfiles-test tests/   # also runs the sudo tests
-docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:v0.11.0 -x install.sh lib/*.sh bin/dotfiles tests/stubs/* tests/integration/*.sh
+docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:v0.11.0 -x install.sh lib/*.sh bin/dotfiles tests/stubs/* tests/integration/*.sh modules/bash/files/bash_bootstrap
 ```
 
 Fixture modules are built per test with `mkmod <root> <bootstrap|post-bootstrap> <id> [dep...]` from `tests/helpers.bash`.
@@ -152,7 +158,7 @@ Fixture modules are built per test with `mkmod <root> <bootstrap|post-bootstrap>
 
 CI (`.github/workflows/ci.yml`) on every push to `develop`/`main` and on PRs:
 - `shellcheck` (pinned image) and `bats`;
-- `integration (fedora:latest | ubuntu:rolling)`, after both pass: the commit is put on branch `ci-under-test`, mounted read-only at `/src` in a fresh container, and `tests/integration/run.sh` runs the real launcher (`DOTFILES_REPO=/src`) with `tests/integration/dotfiles.ci.toml`, then checks `mise -E <id> bootstrap plan` shows `0 create, 0 update, … 0 remove` for every applied module, then re-runs `dotfiles`. On failure it prints the run logs.
+- `integration (fedora:latest | ubuntu:rolling)`, after both pass: the commit is put on branch `ci-under-test`, mounted read-only at `/src` in a fresh container, and `tests/integration/run.sh` runs the real launcher (`DOTFILES_REPO=/src`) with `tests/integration/dotfiles.ci.toml`, then for every applied module checks `mise -E <id> bootstrap plan` shows `0 create, 0 update, … 0 remove` (plan covers system packages only; "nothing configured" is fine) and `mise -E <id> bootstrap status --missing` passes (tools and dotfiles too), then runs `dotfiles` twice more. If `bash` was applied it also checks `~/.bashrc` has the include line once and that a clean `env -i … bash -ic` shell has `~/.local/bin` on PATH, `dotfiles`, mise activated, mise completion and the oh-my-posh prompt. On failure it prints the run logs.
 
 Test hooks: `DOTFILES_ROOT` (repo/module tree), `DOTFILES_OS_RELEASE` (os-release path), `DOTFILES_LOG_DIR` (log directory), `DOTFILES_COLOR`, `DOTFILES_YQ` (yq command), `MISE_CONFIG_DIR` (mise's config dir, as mise itself reads it).
 

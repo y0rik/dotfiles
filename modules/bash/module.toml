@@ -1,0 +1,2 @@
+description = "~/.bash_bootstrap (PATH, mise activation, completion, oh-my-posh prompt) and one line in ~/.bashrc that sources it"
+depends = ["base", "mise"]

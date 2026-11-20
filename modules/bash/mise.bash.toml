@@ -1,0 +1,7 @@
+[tools]
+oh-my-posh = "latest"
+
+[dotfiles]
+"~/.bash_bootstrap" = "files/bash_bootstrap"
+# One line in ~/.bashrc; mise adds it once and never duplicates it.
+"~/.bashrc/dotfiles-include" = { line = '[ -f ~/.bash_bootstrap ] && . ~/.bash_bootstrap' }

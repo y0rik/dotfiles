@@ -1,0 +1,2 @@
+description = "mise's own extras: the usage tool, which mise needs for bash completion"
+depends = ["base"]

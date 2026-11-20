@@ -1,0 +1,4 @@
+# mise itself comes from install.sh; this module adds what it needs around it.
+# Its shell activation lives in ~/.bash_bootstrap (module "bash").
+[tools]
+usage = "latest" # `mise completion bash` needs it

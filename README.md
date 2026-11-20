@@ -20,7 +20,7 @@ The launcher:
 4. clones this repo to `~/.dotfiles`, or fast-forwards an existing clone. It refuses (exit 2) if the clone has local changes;
 5. links `~/.local/bin/dotfiles` and runs it with your flags.
 
-Running it again is safe: it pulls the latest repo and re-applies. After the first run, use `dotfiles` directly (open a new terminal first; on Kubuntu, log out and back in).
+Running it again is safe: it pulls the latest repo and re-applies. After the first run, use `dotfiles` directly (open a new terminal first: the `bash` module puts `~/.local/bin` on PATH; without it, on Kubuntu, log out and back in).
 
 Launcher settings (environment variables): `DOTFILES_BRANCH` (default `main`), `DOTFILES_DIR` (default `~/.dotfiles`), `DOTFILES_REPO`.
 
@@ -70,6 +70,8 @@ exclude = ["nvidia"]       # install everything EXCEPT these modules
 | Module | Phase | Installs | Needs |
 |---|---|---|---|
 | `base` | bootstrap | git, curl, wget, gnupg, ca-certificates, tar, unzip, tree, rsync, nano | — |
+| `mise` | bootstrap | usage (for mise's bash completion); mise itself comes from `install.sh` | base |
+| `bash` | bootstrap | `~/.bash_bootstrap` (PATH, mise activation and completion, oh-my-posh prompt), one line in `~/.bashrc` that sources it; oh-my-posh | base, mise |
 
 _(More modules are being added.)_
 

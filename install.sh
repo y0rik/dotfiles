@@ -130,7 +130,7 @@ main() {
   link_runner "$dir"
 
   if ((path_hint)); then
-    say "$HOME/.local/bin is not on your PATH yet: open a new terminal (on Kubuntu, log out and back in) to use \`dotfiles\` directly"
+    say "$HOME/.local/bin is not on your PATH yet: open a new terminal (the bash module adds it) to use \`dotfiles\` directly"
   fi
   say "running: dotfiles $*"
   exec "$HOME/.local/bin/dotfiles" "$@"
