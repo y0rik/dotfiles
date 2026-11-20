@@ -107,16 +107,26 @@ apply_save_env() {
 
 # _apply_detail <output-file> <kind>: one short reason for the status line.
 #   skip: text after the last "SKIP:" line (modules print it before exit 3)
-#   fail: the last error-looking line from the tool mise ran (dnf, apt, a
-#         task); else mise's own last ERROR line, minus its generic footer
-#         ("Version: …", "Run with --verbose …"); else the last line.
+#   fail: the first [tools] entry mise marked ✗ ("node@26: <its stderr>"); else the
+#         last error-looking line from the tool mise ran (dnf, apt, a task),
+#         skipping mise's progress bars; else mise's own last ERROR line, minus
+#         its generic footer ("Version: …", "Run with --verbose …"); else the
+#         last line.
 _apply_detail() {
-  local file="$1" kind="$2" line=""
+  local file="$1" kind="$2" line="" tool msg
   # sed, not grep: "no match" must not count as an error under set -e.
   if [[ "$kind" == skip ]]; then
     line="$(sed -n -E 's/.*SKIP:[[:space:]]*//p' "$file" | tail -n1)"
   else
-    line="$(sed -n -E '/^mise ERROR/d; /^E: |[Ee][Rr][Rr][Oo][Rr]|[Ff]ailed|[Nn]o match|[Nn]ot found|[Uu]nable|[Cc]annot/p' "$file" | tail -n1)"
+    # The first ✗ is the cause; later ones are often "Skipped due to failed dependency".
+    line="$(sed -n -E '/failed: Skipped due to failed dependency/d; s/^mise ✗ ([^ ]+) .*failed: /\1 /p' "$file" | head -n1)"
+    if [[ -n "$line" ]]; then
+      tool="${line%% *}" msg="${line#* }"
+      [[ "$msg" == *"last stderr: "* ]] && msg="${msg##*last stderr: }"
+      [[ "$msg" =~ ^/[^\ ]*:\ (.*)$ ]] && msg="${BASH_REMATCH[1]}" # drop "/path/to/bin: "
+      line="$tool: $msg"
+    fi
+    [[ -n "$line" ]] || line="$(sed -n -E '/^mise ERROR/d; /█|░/d; /^E: |[Ee][Rr][Rr][Oo][Rr]|[Ff]ailed|[Nn]o match|[Nn]ot found|[Uu]nable|[Cc]annot/p' "$file" | tail -n1)"
     [[ -n "$line" ]] || line="$(sed -n -E '/^mise ERROR (Version:|Run with)/d; /^mise ERROR/p' "$file" | tail -n1)"
     [[ -n "$line" ]] || line="$(sed -n '/[^[:space:]]/p' "$file" | tail -n1)"
   fi

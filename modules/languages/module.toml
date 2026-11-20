@@ -1,0 +1,2 @@
+description = "Language runtimes through mise: Python, Go, Node.js"
+depends = ["base"]

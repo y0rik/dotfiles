@@ -1,0 +1,11 @@
+[bootstrap.packages]
+libatomic = { names = { apt = "libatomic1", dnf = "libatomic" } } # mise's Node binary links it
+
+[tools]
+python = "latest"
+go = "latest"
+node = "latest" # "lts" for the long-term-support line
+
+[tasks.bootstrap]
+description = "Check the runtimes run"
+run = "python --version && go version && node --version && npm --version"

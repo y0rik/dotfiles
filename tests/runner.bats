@@ -72,6 +72,14 @@ links() { (cd "$MISE_DIR/conf.d" && ls) | tr '\n' ' ' | sed 's/ $//'; }
   [[ "$output" == *"✗ cli"*"mise ERROR task bootstrap failed: exit code 7"* ]]
 }
 
+@test "a failed mise tool: the ✗ detail is that tool and its error, not the progress bar" {
+  STUB_TOOLFAIL=cli run dotfiles --bootstrap
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"✗ cli"*"node@26.13.1: error while loading shared libraries: libatomic.so.1"* ]]
+  [[ "$output" != *"installed 2 tools"* ]]
+  [[ "$output" != *"Skipped due to failed dependency"* ]]
+}
+
 @test "one module is counted as \"1 module\"" {
   run dotfiles --bootstrap --only base
   [[ "$output" == *"· 1 module · log"* ]]

@@ -64,7 +64,7 @@ Published as a gist; the repo copy is the source of truth. It can't source `lib/
    - `mise -E <id> bootstrap --yes` from `$HOME`, `NO_COLOR=1`, output into the log.
    - exit 0 → `mise -E <id> bootstrap status --missing` must also pass, else ✗ "still missing after apply".
    - exit 3 → `skipped`; the reason shown is the text after the module's last `SKIP:` line.
-   - any other exit → ✗ with the last error-looking output line.
+   - any other exit → ✗ with a short reason: the first `[tools]` entry mise marked ✗ (`node@26: <its error>`), else the last error-looking line from dnf/apt/a task (progress bars skipped), else mise's last ERROR line minus its generic footer.
    - a mise `WARN … unknown field` / `… is required` line → ✗ even on exit 0 (mise ignores that part of the module).
 4. **Phases:** bootstrap, then the prompt `Continue to post-bootstrap …? [y/N]` (only if post-bootstrap modules are selected; EOF = no). `--yes` alone = bootstrap only. `--bootstrap` / `--post-bootstrap` pick phases explicitly; both = both, no prompt. Statuses carry across phases, so a failed `base` blocks `ssh`.
 5. **After:** each phase prints `OK: N modules (k skipped)` or `FAILED: k of N modules (…); blocked: …. See log.` The linked set is saved as `env = [...]` in `miserc.local.toml` (only that line is owned; other lines kept), even when modules failed. Exit 1 if anything in any phase was ✗ or blocked.
@@ -129,6 +129,9 @@ Rules:
 - Prefer `[tools]` (mise registry) for CLI tools: same name and version on both distros. Use `[bootstrap.packages]` for what the registry lacks or what belongs to the system (network tools, libraries).
 - Config files go in `files/` with a header saying where the link lives. Where the tool can check its own config cheaply, the bootstrap task does it (`nvim --headless -c qa` must print nothing).
 - End a module with a `[tasks.bootstrap]` that checks each tool by the name you type (`command -v dig`, `bat --version`): it catches a package that installs a different binary name (Ubuntu's `batcat`).
+- `mise -E <id>` loads **only** that module. A tool that runs on a runtime at install time or in the module's check (`npm:…` on Node) needs the runtime in the same module's `[tools]`; keep that line the same as in `languages`, and depend on `languages` for its system libraries and the order. `pipx:…` tools use `uv`, declared in the module (uv brings its own Python).
+- mise doesn't run npm dependencies' install scripts unless allowed: `"npm:pkg" = { version = "latest", allow_builds = ["dep"] }` (claude-code-router needs it for better-sqlite3). Check the result in the module's task.
+- To use another source than the registry default, write the backend id as the tool name (`"aqua:anomalyco/opencode" = "latest"`); a `backend = …` option is rejected.
 - Anything imperative goes in `[tasks.bootstrap]` (run last), with `skip_if` where an "already done" check is cheap.
 - "Does not apply on this machine" (no NVIDIA GPU, …): print `SKIP: <reason>` and `exit 3`. The runner shows `skipped: <reason>`; it is not a failure.
 
@@ -157,7 +160,7 @@ Fixture modules are built per test with `mkmod <root> <bootstrap|post-bootstrap>
 
 `tests/install.bats` runs `install.sh` offline: `DOTFILES_REPO` is a local fixture repo whose `bin/dotfiles` only records its arguments, and the stub `mise` stands in for the real one (one test fakes `curl` to check the mise install path). Installing git/curl with dnf/apt is checked by hand in `fedora:latest` / `ubuntu:rolling` containers.
 
-`tests/runner.bats` runs the real `bin/dotfiles` against a fixture tree (`DOTFILES_ROOT`) and a temporary `HOME`, with `tests/stubs/` first on `PATH`. The stub `mise` only answers for modules reachable as `$MISE_CONFIG_DIR/conf.d/<id>/mise.<id>.toml`, logs every call to `STUB_MISE_LOG`, and misbehaves per module id via `STUB_FAIL` (dnf-style error plus mise's footer), `STUB_TASKFAIL`, `STUB_SKIP`, `STUB_WARN`, `STUB_MISSING` (space-separated ids) and `STUB_MISE_VERSION`. The stub `sudo` logs to `STUB_SUDO_LOG` and exits `STUB_SUDO_EXIT`. Sudo tests skip when run as root.
+`tests/runner.bats` runs the real `bin/dotfiles` against a fixture tree (`DOTFILES_ROOT`) and a temporary `HOME`, with `tests/stubs/` first on `PATH`. The stub `mise` only answers for modules reachable as `$MISE_CONFIG_DIR/conf.d/<id>/mise.<id>.toml`, logs every call to `STUB_MISE_LOG`, and misbehaves per module id via `STUB_FAIL` (dnf-style error plus mise's footer), `STUB_TASKFAIL`, `STUB_TOOLFAIL` (a failed `[tools]` entry with progress bars and a follow-on ✗), `STUB_SKIP`, `STUB_WARN`, `STUB_MISSING` (space-separated ids) and `STUB_MISE_VERSION`. The stub `sudo` logs to `STUB_SUDO_LOG` and exits `STUB_SUDO_EXIT`. Sudo tests skip when run as root.
 
 CI (`.github/workflows/ci.yml`) on every push to `develop`/`main` and on PRs:
 - `shellcheck` (pinned image) and `bats`;

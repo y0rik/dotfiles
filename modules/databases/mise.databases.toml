@@ -1,0 +1,13 @@
+# pgcli and mycli aren't in mise's registry: they install from PyPI, each in its
+# own environment (mise's pipx backend, using uv).
+[bootstrap.packages]
+libpq = { names = { apt = "libpq5", dnf = "libpq" } } # PostgreSQL client library pgcli loads
+
+[tools]
+uv = "latest"
+"pipx:pgcli" = "latest"
+"pipx:mycli" = "latest"
+
+[tasks.bootstrap]
+description = "Check the clients run"
+run = "pgcli --version && mycli --version"

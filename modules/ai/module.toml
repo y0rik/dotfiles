@@ -1,0 +1,2 @@
+description = "AI coding tools: Claude Code, claude-code-router (ccr, with the Node it runs on), opencode"
+depends = ["base", "languages"]

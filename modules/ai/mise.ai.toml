@@ -1,0 +1,21 @@
+[tools]
+claude = "latest"                       # Claude Code
+"aqua:anomalyco/opencode" = "latest"    # opencode as a prebuilt binary (the registry default is npm)
+# claude-code-router (`ccr`) isn't in mise's registry. mise skips dependencies'
+# install scripts unless allowed; better-sqlite3 needs its script to get its
+# native binding, otherwise ccr can't load its config.
+"npm:@musistudio/claude-code-router" = { version = "latest", allow_builds = ["better-sqlite3"] }
+# ccr runs on Node. `mise -E ai` loads only this module, so Node is declared
+# here as well as in module "languages" (a dependency, for libatomic and the
+# order): keep the two lines the same.
+node = "latest"
+
+[tasks.bootstrap]
+description = "Check the tools run and ccr's native binding was built"
+run = """
+claude --version && opencode --version && ccr --help >/dev/null || exit 1
+find "$(mise where npm:@musistudio/claude-code-router)" -name better_sqlite3.node | grep -q . || {
+  echo "claude-code-router: better-sqlite3 has no native binding (see allow_builds)" >&2
+  exit 1
+}
+"""

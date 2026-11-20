@@ -1,0 +1,2 @@
+description = "Database clients: pgcli (PostgreSQL) and mycli (MySQL/MariaDB), as Python apps through uv"
+depends = ["base", "languages"]

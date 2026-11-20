@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Stub mise for tests/runner.bats. Behaviour per module id comes from env:
-#   STUB_FAIL / STUB_TASKFAIL / STUB_SKIP / STUB_WARN / STUB_MISSING   space-separated ids
+#   STUB_FAIL / STUB_TASKFAIL / STUB_TOOLFAIL / STUB_SKIP / STUB_WARN / STUB_MISSING   space-separated ids
 #   STUB_MISE_VERSION                                   version to report
 #   STUB_MISE_LOG                                       every call is appended here
 set -euo pipefail
@@ -39,6 +39,20 @@ if in_list STUB_FAIL "$id"; then
   echo "Error: No match for argument: $id-ce"
   echo "mise ERROR dnf exited with non-zero status: exit code 1"
   echo "mise ERROR Version: 2026.11.9 linux-x64 (2026-11-16)"
+  echo "mise ERROR Run with --verbose or MISE_VERBOSE=1 for more information"
+  exit 1
+fi
+if in_list STUB_TOOLFAIL "$id"; then
+  # Real mise output when one of several [tools] fails (node without libatomic).
+  echo "mise bootstrap: tools"
+  echo "mise node@26.13.1 /home/u/.local/share/mise/installs/node/26.13.1/bin/node: error while loading shared libraries: libatomic.so.1: cannot open shared object file: No such file or directory"
+  echo "mise ERROR ~/.local/share/mise/installs/node/26.13.1/bin/node failed"
+  echo "mise ✗ node@26.13.1   9.5s · failed: ~/.local/share/mise/installs/node/26.13.1/bin/node exited with non-zero status: exit code 127; last stderr: /home/u/.local/share/mise/installs/node/26.13.1/bin/node: error while loading shared libraries: libatomic.so.1: cannot open shared object file: No such file or directory"
+  echo "mise ✓ go@1.27.4      17.3s  go1.27.4.linux-amd64.tar.gz"
+  echo "mise ✗ npm:some-cli@latest · failed: Skipped due to failed dependency"
+  echo "mise ████████████████ 3/3 · installed 2 tools · 1 failed in 20.1s"
+  echo "mise ERROR installation failed; previous lockfiles were preserved"
+  echo "mise ERROR Version: 2026.11.10 linux-x64 (2026-11-18)"
   echo "mise ERROR Run with --verbose or MISE_VERBOSE=1 for more information"
   exit 1
 fi

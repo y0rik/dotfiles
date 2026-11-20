@@ -78,6 +78,10 @@ exclude = ["nvidia"]       # install everything EXCEPT these modules
 | `kitty` | bootstrap | kitty (distro package); `~/.config/kitty/kitty.conf` (starter) | base |
 | `yazi` | bootstrap | yazi, file; `~/.config/yazi/yazi.toml` (empty: defaults) | base |
 | `lazygit` | bootstrap | lazygit; `~/.config/lazygit/config.yml` (empty: defaults) | base |
+| `languages` | bootstrap | Python, Go, Node.js (mise); libatomic (Node needs it) | base |
+| `databases` | bootstrap | pgcli, mycli (from PyPI through uv); libpq | base, languages |
+| `pre-commit` | bootstrap | pre-commit | base |
+| `ai` | bootstrap | Claude Code, opencode, claude-code-router (`ccr`) and the Node it runs on | base, languages |
 
 _(More modules are being added.)_
 

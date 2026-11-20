@@ -1,0 +1,6 @@
+[tools]
+pre-commit = "latest"
+
+[tasks.bootstrap]
+description = "Check pre-commit runs"
+run = "pre-commit --version"
