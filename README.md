@@ -74,8 +74,18 @@ exclude = ["nvidia"]       # install everything EXCEPT these modules
 | `bash` | bootstrap | `~/.bash_bootstrap` (PATH, mise activation and completion, oh-my-posh prompt), one line in `~/.bashrc` that sources it; oh-my-posh | base, mise |
 | `network` | bootstrap | openssl, dig, tcpdump, traceroute, iperf3, nmap, whois (distro packages) | base |
 | `cli` | bootstrap | jq, yq, fzf, bat, btop, xh, lnav, hunk (mise, same names on both distros) | base |
+| `neovim` | bootstrap | Neovim, ripgrep, fd; `~/.config/nvim/init.lua` (starter options, no plugins) | base |
+| `kitty` | bootstrap | kitty (distro package); `~/.config/kitty/kitty.conf` (starter) | base |
+| `yazi` | bootstrap | yazi, file; `~/.config/yazi/yazi.toml` (empty: defaults) | base |
+| `lazygit` | bootstrap | lazygit; `~/.config/lazygit/config.yml` (empty: defaults) | base |
 
 _(More modules are being added.)_
+
+## Config files
+
+Config files are links into the repo (`~/.config/kitty/kitty.conf -> ~/.dotfiles/…/modules/kitty/files/kitty.conf`): edit the repo copy, and commit it to keep the change.
+
+If a real file is already where a link goes, the module fails with `files: refusing to overwrite existing files` and the file is left alone; the log names it. Move it away (or merge it into the repo copy) and re-run.
 
 ## Pinning a version
 

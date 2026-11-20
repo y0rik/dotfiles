@@ -1,0 +1,9 @@
+[tools]
+lazygit = "latest"
+
+[dotfiles]
+"~/.config/lazygit/config.yml" = "files/config.yml"
+
+[tasks.bootstrap]
+description = "Check lazygit runs"
+run = "lazygit --version"

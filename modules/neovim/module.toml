@@ -1,0 +1,2 @@
+description = "Neovim, ripgrep and fd (for searching from the editor), and a starter init.lua"
+depends = ["base"]

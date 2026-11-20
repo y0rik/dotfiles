@@ -1,0 +1,11 @@
+[tools]
+neovim = "latest"
+ripgrep = "latest"
+fd = "latest"
+
+[dotfiles]
+"~/.config/nvim/init.lua" = "files/init.lua"
+
+[tasks.bootstrap]
+description = "Check the tools run and the config loads without errors"
+run = "nvim --version && rg --version && fd --version && nvim --headless -c 'qa' 2>&1 | (! grep .)"

@@ -1,0 +1,12 @@
+[bootstrap.packages]
+file = "latest"
+
+[tools]
+yazi = "latest"
+
+[dotfiles]
+"~/.config/yazi/yazi.toml" = "files/yazi.toml"
+
+[tasks.bootstrap]
+description = "Check yazi runs"
+run = "yazi --version && ya --version"

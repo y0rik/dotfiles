@@ -1,0 +1,9 @@
+[bootstrap.packages]
+kitty = "latest"
+
+[dotfiles]
+"~/.config/kitty/kitty.conf" = "files/kitty.conf"
+
+[tasks.bootstrap]
+description = "Check kitty runs"
+run = "kitty --version"

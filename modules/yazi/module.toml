@@ -1,0 +1,2 @@
+description = "yazi file manager (with file, which it uses to detect file types) and its config file"
+depends = ["base"]

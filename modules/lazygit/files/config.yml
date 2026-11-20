@@ -1,0 +1,4 @@
+# ~/.config/lazygit/config.yml: a link to ~/.dotfiles/modules/lazygit/files/config.yml.
+# Empty: lazygit's defaults apply. Add overrides here
+# (https://github.com/jesseduffield/lazygit/blob/master/docs/Config.md).
+{}

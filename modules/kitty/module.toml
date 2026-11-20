@@ -1,0 +1,2 @@
+description = "kitty terminal (distro package, so it has a desktop entry) and a starter kitty.conf"
+depends = ["base"]
